@@ -14,25 +14,21 @@ import java.util.Arrays;
 
 public class HttpClientConfig {
     
-    private static final int CONNECTION_POOL_SIZE = 800;
-    private static final int CONNECTION_POOL_PER_ROUTE = 300;
+    private static final int CONNECTION_POOL_SIZE = 128;
+    private static final int CONNECTION_POOL_PER_ROUTE = 128;
 
     public static CloseableHttpClient createApacheHttpClient() {
         PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
         connectionManager.setMaxTotal(CONNECTION_POOL_SIZE);
         connectionManager.setDefaultMaxPerRoute(CONNECTION_POOL_PER_ROUTE);
-        
+
         RequestConfig requestConfig = RequestConfig.custom()
                 .build();
-        
+
         return HttpClients.custom()
                 .setConnectionManager(connectionManager)
                 .setDefaultRequestConfig(requestConfig)
                 .disableAutomaticRetries()
-                .setDefaultHeaders(Arrays.asList(
-                    new BasicHeader("Connection", "keep-alive"),
-                    new BasicHeader("Keep-Alive", "timeout=65, max=1000")
-                ))
                 .build();
     }
 } 

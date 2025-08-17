@@ -3,15 +3,14 @@ package com.murilo.rinha;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.murilo.rinha.client.ApacheHttpFallbackPaymentProcessorClient;
-import com.murilo.rinha.client.ApacheHttpPaymentProcessorClient;
 import com.murilo.rinha.client.HostLockClient;
+import com.murilo.rinha.client.MyUltraHttpPaymentProcessorClient;
 import com.murilo.rinha.config.AppConfig;
 import com.murilo.rinha.controller.PaymentController;
 import com.murilo.rinha.repository.InMemoryPaymentQueueRepository;
 import com.murilo.rinha.repository.InMemoryPaymentRepository;
 import com.murilo.rinha.service.InMemoryPaymentDLQProcessor;
-import com.murilo.rinha.service.MainProcessorHealthCheckService;
+import com.murilo.rinha.service.ProcessorHealthCheckService;
 import com.murilo.rinha.service.PaymentService;
 
 import java.io.IOException;
@@ -60,14 +59,17 @@ public class RinhaApplication {
       InMemoryPaymentRepository paymentRepository = new InMemoryPaymentRepository();
       InMemoryPaymentQueueRepository dlqRepository = new InMemoryPaymentQueueRepository();
 
-      ApacheHttpPaymentProcessorClient mainClient = new ApacheHttpPaymentProcessorClient();
-      ApacheHttpFallbackPaymentProcessorClient fallbackClient = new ApacheHttpFallbackPaymentProcessorClient();
+      MyUltraHttpPaymentProcessorClient myUltraMainHttpPaymentProcessorClient = MyUltraHttpPaymentProcessorClient.fromAppConfig();
+      MyUltraHttpPaymentProcessorClient myUltraFallbackHttpPaymentProcessorClient =
+          new MyUltraHttpPaymentProcessorClient(AppConfig.getFallbackProcessorHost(), Integer.parseInt(AppConfig.getFallbackProcessorPort()),"/payments", 256);
       HostLockClient hostLockClient = new HostLockClient(objectMapper);
 
-      var mainHealthCheck = new MainProcessorHealthCheckService(
+      var mainHealthCheck = new ProcessorHealthCheckService(
           AppConfig.getMainProcessorHost(), AppConfig.getMainProcessorPort());
+      var fallbackHealthCheck = new ProcessorHealthCheckService(
+          AppConfig.getFallbackProcessorHost(), AppConfig.getFallbackProcessorPort());
       PaymentService paymentService = new PaymentService(
-          mainClient, fallbackClient, hostLockClient, paymentRepository, dlqRepository, mainHealthCheck);
+          myUltraMainHttpPaymentProcessorClient, myUltraFallbackHttpPaymentProcessorClient, hostLockClient, paymentRepository, dlqRepository, mainHealthCheck, fallbackHealthCheck);
       InMemoryPaymentDLQProcessor dlqProcessor = new InMemoryPaymentDLQProcessor(dlqRepository, paymentService);
       PaymentController paymentController = new PaymentController(paymentService, dlqRepository);
 
@@ -113,7 +115,7 @@ public class RinhaApplication {
   }
 
   private static void handleKeepAlive(SocketChannel ch, PaymentController controller, ObjectMapper mapper,
-      MainProcessorHealthCheckService mainHealthCheck) {
+      ProcessorHealthCheckService mainHealthCheck) {
     try {
       for (;;) {
         ByteBuffer hdr = TL_HDR.get();
@@ -210,16 +212,16 @@ public class RinhaApplication {
           String target = asciiSlice(hdr, p, space); // paths tipo /payments-summary?from=...&to=...
 
           if (target.startsWith("/payments-summary-lock")) {
-            mainHealthCheck.setMainDown();
+            mainHealthCheck.setDown();
             String qs = null; int qidx = target.indexOf('?');
             if (qidx >= 0) { qs = target.substring(qidx + 1); }
             var params = parseQuery(qs);
             Instant from = params.containsKey("from")
-                ? Instant.parse(params.get("from"))
-                : Instant.now().minus(30, ChronoUnit.SECONDS);
+                ? Instant.parse(params.get("from")).truncatedTo(ChronoUnit.MILLIS)
+                : Instant.now().minus(150, ChronoUnit.SECONDS).truncatedTo(ChronoUnit.MILLIS);
             Instant to   = params.containsKey("to")
-                ? Instant.parse(params.get("to"))
-                : Instant.now();
+                ? Instant.parse(params.get("to")).truncatedTo(ChronoUnit.MILLIS)
+                : Instant.now().truncatedTo(ChronoUnit.MILLIS);
             var result = controller.getPaymentSummaryLock(from, to);
             byte[] json = mapper.writeValueAsBytes(result);
             writeJson(ch, json, !closeAfter);
@@ -228,16 +230,16 @@ public class RinhaApplication {
           }
 
           if (target.startsWith("/payments-summary")) {
-            mainHealthCheck.setMainDown();
+            mainHealthCheck.setDown();
             String qs = null; int qidx = target.indexOf('?');
             if (qidx >= 0) { qs = target.substring(qidx + 1); }
             var params = parseQuery(qs);
             Instant from = params.containsKey("from")
-                ? Instant.parse(params.get("from"))
-                : Instant.now().minus(120, ChronoUnit.SECONDS);
+                ? Instant.parse(params.get("from")).truncatedTo(ChronoUnit.MILLIS)
+                : Instant.now().minus(150, ChronoUnit.SECONDS).truncatedTo(ChronoUnit.MILLIS);
             Instant to   = params.containsKey("to")
-                ? Instant.parse(params.get("to"))
-                : Instant.now();
+                ? Instant.parse(params.get("to")).truncatedTo(ChronoUnit.MILLIS)
+                : Instant.now().truncatedTo(ChronoUnit.MILLIS);
             var result = controller.getPaymentSummary(from, to);
             byte[] json = mapper.writeValueAsBytes(result);
             writeJson(ch, json, !closeAfter);

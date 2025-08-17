@@ -11,8 +11,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class MainProcessorHealthCheckService {
-    private volatile boolean isMainUp = true;
+public class ProcessorHealthCheckService {
+    private volatile boolean isUp = true;
     private final HttpClient httpClient;
     private final String healthUrl;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -20,7 +20,7 @@ public class MainProcessorHealthCheckService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Object monitor = new Object();
 
-    public MainProcessorHealthCheckService(String mainHost, String mainPort) {
+    public ProcessorHealthCheckService(String mainHost, String mainPort) {
         this.httpClient = HttpClient.newHttpClient();
         this.healthUrl = "http://" + mainHost + ":" + mainPort + "/payments/service-health";
         startHealthCheck();
@@ -39,44 +39,44 @@ public class MainProcessorHealthCheckService {
                     boolean failing = jsonNode.get("failing").asBoolean();
 
                     if (!failing) {
-                        setMainUp();
+                        setUp();
                     } else {
-                        setMainDown();
+                        setDown();
                     }
                 } else {
-                    setMainDown();
+                    setDown();
                 }
             } catch (Exception e) {
-                setMainDown();
+                setDown();
             }
         }, 0, 5, TimeUnit.SECONDS);
     }
 
-    public void setMainDown() {
+    public void setDown() {
         synchronized (monitor) {
-            isMainUp = false;
+            isUp = false;
             if (resetFuture == null || resetFuture.isDone()) {
-                resetFuture = scheduler.schedule(() -> setMainUp(), 5040, TimeUnit.MILLISECONDS);
+                resetFuture = scheduler.schedule(() -> setUp(), 5040, TimeUnit.MILLISECONDS);
             }
         }
     }
 
-    public void setMainUp() {
+    public void setUp() {
         synchronized (monitor) {
-            if (!isMainUp) {
-                isMainUp = true;
+            if (!isUp) {
+                isUp = true;
                 monitor.notifyAll();
             }
         }
     }
 
-    public boolean isMainUp() {
-        return isMainUp;
+    public boolean isUp() {
+        return isUp;
     }
 
-    public void waitUntilMainUp() throws InterruptedException {
+    public void waitUntilUp() throws InterruptedException {
         synchronized (monitor) {
-            while (!isMainUp) {
+            while (!isUp) {
                 monitor.wait();
             }
         }

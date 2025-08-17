@@ -21,12 +21,6 @@
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
 			<version>2.17.0</version>
-			<exclusions>
-				<exclusion>
-					<groupId>net.bytebuddy</groupId>
-					<artifactId>byte-buddy</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.datatype</groupId>
@@ -37,12 +31,6 @@
 			<groupId>org.apache.httpcomponents.client5</groupId>
 			<artifactId>httpclient5</artifactId>
 			<version>5.2.1</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.slf4j</groupId>
-					<artifactId>slf4j-api</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents.core5</groupId>
@@ -72,66 +60,42 @@
 					<release>21</release>
 				</configuration>
 			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.2.5</version>
-			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.5.1</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<transformers>
-								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>com.murilo.rinha.RinhaApplication</mainClass>
-								</transformer>
-							</transformers>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
 	<profiles>
-		<profile>
-			<id>native</id>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.graalvm.buildtools</groupId>
-						<artifactId>native-maven-plugin</artifactId>
-						<version>0.10.2</version>
-						<executions>
-							<execution>
-								<goals>
-									<goal>compile-no-fork</goal>
-								</goals>
-								<phase>package</phase>
-							</execution>
-						</executions>
-						<configuration>
-							<mainClass>com.murilo.rinha.RinhaApplication</mainClass>
-							<imageName>app</imageName>
-							<buildArgs>
-								<buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
-								<buildArg>--initialize-at-run-time=org.newsclub.net.unix.AFSocketAddress,org.newsclub.net.unix.SentinelSocketAddress</buildArg>
-								<buildArg>-H:+ReportExceptionStackTraces</buildArg>
-								<buildArg>--report-unsupported-elements-at-runtime</buildArg>
-							</buildArgs>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>0.11.0</version> <!-- ou a mais recente -->
+            <executions>
+              <execution>
+                <goals><goal>compile-no-fork</goal></goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <mainClass>com.murilo.rinha.RinhaApplication</mainClass>
+              <imageName>app</imageName>
+              <buildArgs>
+                <!-- compatível e rápido -->
+                <buildArg>--no-fallback</buildArg>
+                <buildArg>--gc=serial</buildArg> <!-- Community: serial/epsilon -->
+                <buildArg>-march=x86-64-v3</buildArg> <!-- ou -march=compatibility se rodar em CPUs antigas -->
+                <!-- tunar build -->
+                <buildArg>-J-Xms6g</buildArg>
+                <buildArg>-J-Xmx6g</buildArg>
+                <buildArg>-J-XX:ActiveProcessorCount=${env.NPROC}</buildArg>
+
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
 	</profiles>
 
 </project>

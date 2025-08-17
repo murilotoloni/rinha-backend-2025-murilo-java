@@ -23,7 +23,7 @@ public class InMemoryPaymentDLQProcessor {
 
     private void runWorker() {
         while (true) {
-            for (int i = 0; i < 350; i++) {
+            for (int i = 0; i < 550; i++) {
                 var request = dlqRepository.dequeue();
                 if(request!=null){
                   processPayment(request);

@@ -235,7 +235,9 @@ export async function checkPaymentsConsistency() {
 
   if (inconsistencies > 0) {
     console.warn(`${inconsistencies} inconsistências encontradas.`);
+    console.warn(`from: ${from}  to: ${to}`);
     console.warn(`backend: ${backendPaymentsSummary.default.totalRequests} processor: ${defaultAdminPaymentsSummary.totalRequests}`)
+    console.warn(`backend: ${backendPaymentsSummary.fallback.totalRequests} processor: ${fallbackAdminPaymentsSummary.totalRequests}`)
   }
 
   sleep(10);
